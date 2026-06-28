@@ -53,21 +53,26 @@ class IronClawAgent(ClawAgent):
         return "PASS"
 
 class ClawMemAgent(ClawAgent):
-    """ClawMem: Vectorized memory retrieval and context injection."""
-    def run(self, task, bus, armory):
-        print(f"[{self.name}] ACT: Retrieving relevant context...")
-        # In a real implementation, this would use embeddings/search.
-        # For Piece 4, we leverage the existing safla history.
-        return "Context: Legion active. Previous signals indexed."
+    """ClawMem: Persistent context injection from SAFLA history."""
+    def run(self, task, bus, armory, memory=None):
+        print(f"[{self.name}] ACT: Injecting contextual memory...")
+        if memory and len(memory) > 0:
+            last_task = memory[-1].get("task", "None")
+            context = f"PREVIOUS CONTEXT: Last task was '{last_task}'"
+        else:
+            context = "PREVIOUS CONTEXT: No history found. Initializing fresh Legion state."
+        bus.publish(self.name, context)
+        return context
 
 class TrinityClawAgent(ClawAgent):
-    """TrinityClaw: Self-Refinement and Task Decomposition."""
+    """TrinityClaw: Task decomposition and logic optimization."""
     def run(self, task, bus, armory):
-        print(f"[{self.name}] ACT: Decomposing task into optimized steps...")
-        steps = [f"Step {i+1}: Optimize {s.strip()}" for i, s in enumerate(task.split(',')) if s.strip()]
-        res = " | ".join(steps)
-        bus.publish(self.name, f"PLAN: {res}")
-        return res
+        print(f"[{self.name}] ACT: Decomposing task logic...")
+        # Break down task into logic steps for subsequent agents
+        steps = [s.strip().upper() for s in task.split() if len(s) > 3]
+        plan = f"OPTIMIZED PLAN: {' -> '.join(steps[:4])}"
+        bus.publish(self.name, plan)
+        return plan
 
 class ClawPrime:
     def __init__(self, storage_path="claw_memory.json"):
@@ -103,30 +108,46 @@ class ClawPrime:
         with open(self.storage_path, 'w') as f: json.dump(self.memory, f, indent=4)
 
     def secure_router(self, task):
-        audit_result = self.legion["IronClaw"].run(task, self.bus, self.armory)
-        if audit_result.startswith("BLOCK"): return []
-
-        pipeline = [self.legion["ClawMem"]] # Context injection first
-        
         task_lower = task.lower()
-        if any(k in task_lower for k in ["plan", "how to", "complex"]):
-            pipeline.append(self.legion["TrinityClaw"])
-        if any(k in task_lower for k in ["research", "analyze", "find"]):
-            pipeline.append(self.legion["ARC"])
         
-        if len(pipeline) == 1: pipeline.append(self.legion["OpenClaw"])
+        # 1. Mandatory IronClaw Audit
+        audit_result = self.legion["IronClaw"].run(task, self.bus, self.armory)
+        if audit_result.startswith("BLOCK"):
+            print(f"[{self.name}] !!! EMERGENCY STOP !!! Task Blocked.")
+            return []
+
+        # 2. Start with ClawMem (Context Injection)
+        pipeline = [("ClawMem", task)]
+        
+        # 3. Add TrinityClaw if task is complex (Logic Decomposition)
+        if len(task.split()) > 3 or "?" in task:
+            pipeline.append(("TrinityClaw", task))
+            
+        # 4. Route to Specialized Agents
+        if any(k in task_lower for k in ["research", "analyze", "find", "signal"]):
+            pipeline.append(("ARC", task))
+        elif any(k in task_lower for k in ["scale", "swarm", "parallel"]):
+            pipeline.append(("ClawSwarm", task))
+        else:
+            pipeline.append(("OpenClaw", task))
+            
         return pipeline
 
     def safla_cycle(self, task):
         print(f"\n[{self.name}] SENSE: {task}")
-        agents = self.secure_router(task)
-        if not agents: return "BLOCKED"
+        pipeline = self.secure_router(task)
+        if not pipeline: return "BLOCKED"
         
         results = []
-        for agent in agents:
-            res = agent.run(task, self.bus, self.armory)
+        for agent_name, agent_task in pipeline:
+            agent = self.legion[agent_name]
+            # ClawMem needs special access to self.memory
+            if agent_name == "ClawMem":
+                res = agent.run(agent_task, self.bus, self.armory, memory=self.memory)
+            else:
+                res = agent.run(agent_task, self.bus, self.armory)
             results.append(res)
-        
+            
         self.memory.append({"task": task, "results": results, "timestamp": time.time()})
         self.save_memory()
         return results
