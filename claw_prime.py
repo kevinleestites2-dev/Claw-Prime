@@ -1,76 +1,111 @@
 import json
 import time
+import os
 
 class LegionBus:
     def __init__(self):
         self.messages = []
-    def publish(self, sender, data):
-        self.messages.append({"sender": sender, "data": data, "timestamp": time.time()})
-        print(f"[BUS] {sender}: {data}")
+    def publish(self, sender, data, metadata=None):
+        entry = {"sender": sender, "data": data, "timestamp": time.time(), "meta": metadata}
+        self.messages.append(entry)
+        print(f"[BUS] {sender} >> {data}")
 
 class ClawAgent:
-    def __init__(self, name, capabilities):
+    def __init__(self, name, domain, tools=None):
         self.name = name
-        self.capabilities = capabilities
+        self.domain = domain
+        self.tools = tools or []
     def run(self, task, bus):
-        print(f"[{self.name}] ACT: Running domain logic for {task[:30]}...")
-        result = f"Output from {self.name} for {task[:20]}"
+        print(f"[{self.name}] ACT: Executing in domain {self.domain}...")
+        # Placeholder for actual module integration
+        result = f"Action complete by {self.name} on: {task[:30]}"
         bus.publish(self.name, result)
         return result
 
 class ClawPrime:
-    def __init__(self):
+    def __init__(self, storage_path="claw_memory.json"):
         self.name = "Claw-Prime"
+        self.storage_path = storage_path
         self.bus = LegionBus()
-        self.memory = []
+        self.memory = self.load_memory()
+        
+        # Instantiate ALL 12 Legion pieces
         self.legion = {
-            "ARC": ClawAgent("ARC", ["research", "analysis"]),
-            "AutoClaw": ClawAgent("AutoClaw", ["execution", "automation"]),
-            "IronClaw": ClawAgent("IronClaw", ["security", "audit"]),
-            "ClawMem": ClawAgent("ClawMem", ["persistence", "recall"])
+            "OpenClaw": ClawAgent("OpenClaw", "Core Execution"),
+            "ARC": ClawAgent("ARC", "Deep Research"),
+            "AutoClaw": ClawAgent("AutoClaw", "Automation"),
+            "OpenCrabs": ClawAgent("OpenCrabs", "High-Perf Rust"),
+            "PicoClaw": ClawAgent("PicoClaw", "Edge/Go"),
+            "ZeroClaw": ClawAgent("ZeroClaw", "Infrastructure"),
+            "TinyAGI": ClawAgent("TinyAGI", "Multi-Agent Coordination"),
+            "TrinityClaw": ClawAgent("TrinityClaw", "Self-Modifying Logic"),
+            "OpenBrowserClaw": ClawAgent("OpenBrowserClaw", "Browser-Native"),
+            "IronClaw": ClawAgent("IronClaw", "Security/Audit"),
+            "ClawMem": ClawAgent("ClawMem", "Persistence Layer"),
+            "ClawSwarm": ClawAgent("ClawSwarm", "Parallel Scaling")
         }
 
-    def router(self, task):
-        # Dispatcher intelligence
+    def load_memory(self):
+        if os.path.exists(self.storage_path):
+            with open(self.storage_path, 'r') as f:
+                return json.load(f)
+        return []
+
+    def save_memory(self):
+        with open(self.storage_path, 'w') as f:
+            json.dump(self.memory, f, indent=4)
+
+    def secure_router(self, task):
+        """Enhanced Router: Pre-flight security check and multi-agent routing."""
         task_lower = task.lower()
-        if any(kw in task_lower for kw in ["research", "find", "who", "what"]):
-            return self.legion["ARC"]
-        if any(kw in task_lower for kw in ["run", "do", "click", "build"]):
-            return self.legion["AutoClaw"]
-        return self.legion["AutoClaw"]
+        
+        # 1. Pre-flight: IronClaw Audit
+        print(f"[{self.name}] SECURITY: IronClaw performing pre-flight audit...")
+        self.legion["IronClaw"].run(f"Audit task: {task}", self.bus)
+
+        # 2. Parallel Dispatch/Swarm logic
+        if "scale" in task_lower or "mass" in task_lower:
+            return [self.legion["ClawSwarm"], self.legion["AutoClaw"]]
+        
+        # 3. Domain Routing
+        if any(k in task_lower for k in ["research", "analyze"]):
+            return [self.legion["ARC"]]
+        if any(k in task_lower for k in ["browser", "web"]):
+            return [self.legion["OpenBrowserClaw"]]
+        if any(k in task_lower for k in ["rust", "speed"]):
+            return [self.legion["OpenCrabs"]]
+            
+        return [self.legion["OpenClaw"]]
 
     def safla_cycle(self, task):
-        """The core Sense-Act-Feedback-Learn-Act loop."""
-        # 1. SENSE
-        print(f"\n[{self.name}] SENSE: New Task -> {task}")
-        self.bus.publish(self.name, f"Sense phase complete for {task[:20]}")
+        print(f"\n[{self.name}] SENSE: {task}")
         
-        # 2. ACT
-        agent = self.router(task)
-        print(f"[{self.name}] DISPATCH: Routing to {agent.name}")
-        action_result = agent.run(task, self.bus)
+        # ACT: Secure Routing
+        agents = self.secure_router(task)
+        results = []
+        for agent in agents:
+            res = agent.run(task, self.bus)
+            results.append(res)
+            
+        # FEEDBACK & LEARN
+        self.memory.append({"task": task, "results": results, "timestamp": time.time()})
+        self.save_memory()
+        print(f"[{self.name}] LEARN: State persisted to {self.storage_path}")
         
-        # 3. FEEDBACK
-        print(f"[{self.name}] FEEDBACK: Observing result -> {action_result}")
-        
-        # 4. LEARN
-        observation = {"task": task, "agent": agent.name, "result": action_result}
-        self.memory.append(observation)
-        print(f"[{self.name}] LEARN: Updating state with {agent.name} metrics.")
-        
-        # 5. ACT (Refinement)
-        print(f"[{self.name}] REFINING: Preparing next stage of execution.")
-        return action_result
+        return results
 
-    def autonomous_loop(self, task, depth=3):
-        print(f"[{self.name}] STARTING AUTONOMOUS ENGINE (Depth: {depth})")
-        current_objective = task
-        for i in range(depth):
-            print(f"\n--- LOOP {i+1} ---")
-            result = self.safla_cycle(current_objective)
-            current_objective = f"Refine and verify: {result}"
-        print(f"[{self.name}] Objective Finalized.")
+    def cli(self):
+        """Live Command Interface"""
+        print(f"\n--- {self.name} COMMAND INTERFACE ---")
+        while True:
+            try:
+                cmd = input(f"{self.name} > ")
+                if cmd.lower() in ['exit', 'quit']: break
+                self.safla_cycle(cmd)
+            except KeyboardInterrupt:
+                break
 
 if __name__ == "__main__":
     commander = ClawPrime()
-    commander.autonomous_loop("Execute the high-signal research on Solana project Heisted.")
+    # To start live: commander.cli()
+    commander.safla_cycle("Scale the research on World project and audit for security.")
