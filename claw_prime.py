@@ -1,9 +1,9 @@
 import json
 import time
 import os
+import re
 
 class LegionBus:
-    """The single source of truth for inter-Claw communication."""
     def __init__(self):
         self.messages = []
     def publish(self, sender, data, metadata=None):
@@ -12,12 +12,10 @@ class LegionBus:
         print(f"[BUS] {sender} >> {data}")
 
 class ArmoryLoader:
-    """The gateway to the 5,300+ Awesome OpenClaw Skills."""
     def __init__(self):
         self.source = "https://github.com/VoltAgent/awesome-openclaw-skills"
     def load_skill(self, skill_name):
         print(f"[ARMORY] Indexing {skill_name} from {self.source}...")
-        # Future: Actual scraping/parsing logic
         return True
 
 class ClawAgent:
@@ -25,10 +23,34 @@ class ClawAgent:
         self.name = name
         self.domain = domain
     def run(self, task, bus, armory):
-        print(f"[{self.name}] ACT: Executing in domain {self.domain}...")
-        result = f"Action complete by {self.name} on: {task[:30]}"
+        print(f"[{self.name}] ACT: Generic execution...")
+        result = f"Generic action by {self.name}"
         bus.publish(self.name, result)
         return result
+
+class ARCAgent(ClawAgent):
+    """AutoResearchClaw: High-signal analysis."""
+    def run(self, task, bus, armory):
+        print(f"[{self.name}] ACT: Deep-brain research starting...")
+        # Simulate research depth
+        signals = ["Solana ecosystem", "Phase 1: Discovery", "High-signal detected"]
+        for signal in signals:
+            bus.publish(self.name, f"SIGNAL: {signal}")
+            time.sleep(0.5)
+        result = f"ARC finalized research on: {task[:20]}"
+        bus.publish(self.name, result)
+        return result
+
+class IronClawAgent(ClawAgent):
+    """IronClaw: Security & Audit."""
+    def run(self, task, bus, armory):
+        print(f"[{self.name}] ACT: Running Zero-Trust audit...")
+        unsafe_patterns = [r"rm -rf", r"delete", r"format", r"kill"]
+        flagged = [p for p in unsafe_patterns if re.search(p, task, re.I)]
+        
+        status = "CLEAN" if not flagged else f"FLAGGED: {flagged}"
+        bus.publish(self.name, f"Audit Status: {status}")
+        return status
 
 class ClawPrime:
     def __init__(self, storage_path="claw_memory.json"):
@@ -38,9 +60,10 @@ class ClawPrime:
         self.armory = ArmoryLoader()
         self.memory = self.load_memory()
         
+        # Instantiate Legion with Specialized Agents
         self.legion = {
             "OpenClaw": ClawAgent("OpenClaw", "Core Execution"),
-            "ARC": ClawAgent("ARC", "Deep Research"),
+            "ARC": ARCAgent("ARC", "Deep Research"),
             "AutoClaw": ClawAgent("AutoClaw", "Automation"),
             "OpenCrabs": ClawAgent("OpenCrabs", "High-Perf Rust"),
             "PicoClaw": ClawAgent("PicoClaw", "Edge/Go"),
@@ -48,7 +71,7 @@ class ClawPrime:
             "TinyAGI": ClawAgent("TinyAGI", "Multi-Agent Coordination"),
             "TrinityClaw": ClawAgent("TrinityClaw", "Self-Modifying Logic"),
             "OpenBrowserClaw": ClawAgent("OpenBrowserClaw", "Browser-Native"),
-            "IronClaw": ClawAgent("IronClaw", "Security/Audit"),
+            "IronClaw": IronClawAgent("IronClaw", "Security/Audit"),
             "ClawMem": ClawAgent("ClawMem", "Persistence Layer"),
             "ClawSwarm": ClawAgent("ClawSwarm", "Parallel Scaling")
         }
@@ -56,28 +79,24 @@ class ClawPrime:
     def load_memory(self):
         if os.path.exists(self.storage_path):
             try:
-                with open(self.storage_path, 'r') as f:
-                    return json.load(f)
+                with open(self.storage_path, 'r') as f: return json.load(f)
             except: return []
         return []
 
     def save_memory(self):
-        with open(self.storage_path, 'w') as f:
-            json.dump(self.memory, f, indent=4)
+        with open(self.storage_path, 'w') as f: json.dump(self.memory, f, indent=4)
 
     def secure_router(self, task):
         task_lower = task.lower()
-        print(f"[{self.name}] SECURITY: IronClaw performing pre-flight audit...")
-        self.legion["IronClaw"].run(f"Audit task: {task}", self.bus, self.armory)
+        audit_res = self.legion["IronClaw"].run(task, self.bus, self.armory)
+        if "FLAGGED" in audit_res:
+            print(f"[{self.name}] HALT: Task failed security audit.")
+            return []
 
         if any(k in task_lower for k in ["scale", "swarm", "parallel"]):
             return [self.legion["ClawSwarm"], self.legion["AutoClaw"]]
         if any(k in task_lower for k in ["research", "analyze", "find"]):
             return [self.legion["ARC"]]
-        if any(k in task_lower for k in ["browser", "web", "site"]):
-            return [self.legion["OpenBrowserClaw"]]
-        if any(k in task_lower for k in ["rust", "speed", "crabs"]):
-            return [self.legion["OpenCrabs"]]
         return [self.legion["OpenClaw"]]
 
     def safla_cycle(self, task):
@@ -89,12 +108,10 @@ class ClawPrime:
             results.append(res)
         self.memory.append({"task": task, "results": results, "timestamp": time.time()})
         self.save_memory()
-        print(f"[{self.name}] LEARN: State persisted.")
         return results
 
     def cli(self):
         print(f"\n--- {self.name} COMMAND INTERFACE ---")
-        print("Legion Online. Armory Linked. Standing by.")
         while True:
             try:
                 cmd = input(f"{self.name} > ")
