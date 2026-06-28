@@ -2,6 +2,7 @@ import json
 import time
 import os
 import re
+import urllib.request
 import urllib.parse
 
 class LegionBus:
@@ -29,19 +30,32 @@ class ClawAgent:
         return result
 
 class OpenBrowserClawAgent(ClawAgent):
-    """OpenBrowserClaw: Real-world signal ingestion interface."""
+    """OpenBrowserClaw: Real-world signal ingestion via live HTTP calls."""
     def run(self, task, bus, armory):
-        print(f"[{self.name}] ACT: Preparing live web signal ingestion...")
-        # Extract query for internal engine logic
+        print(f"[{self.name}] ACT: Fetching live web signals...")
         query = task.replace("research", "").replace("find", "").strip()
         
-        # Publish query for engine consumption (omitting ungrounded search URLs)
-        bus.publish(self.name, f"INTERNAL_QUERY: {query}")
-        
-        # In a grounded environment, this prepares the browser interface
-        res = f"SIGNAL_INGESTED: Pipeline ready for '{query}'"
-        bus.publish(self.name, res)
-        return res
+        try:
+            # Concrete HTTP fetch using DuckDuckGo's Instant Answer API
+            url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1"
+            headers = {'User-Agent': 'Claw-Prime/1.0'}
+            req = urllib.request.Request(url, headers=headers)
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                raw_data = response.read().decode('utf-8')
+                data = json.loads(raw_data)
+                
+                # Extract the most relevant summary (Abstract or Text)
+                signal = data.get("AbstractText") or data.get("Definition") or "No direct summary found; broader indexing required."
+                source = data.get("AbstractURL", "Unknown Source")
+                
+                res = f"LIVE_SIGNAL: {signal[:150]}... (Source: {source})"
+                bus.publish(self.name, res)
+                return res
+        except Exception as e:
+            err = f"SIGNAL_ERROR: Failed to fetch live data ({str(e)})"
+            bus.publish(self.name, err)
+            return err
 
 class ARCAgent(ClawAgent):
     def run(self, task, bus, armory, live_data=None):
@@ -54,7 +68,7 @@ class ARCAgent(ClawAgent):
         
         base_signals = [val for key, val in signals.items() if key.lower() in task.lower()]
         
-        if live_data:
+        if live_data and "LIVE_SIGNAL" in live_data:
             report = f"SYNTHESIS: {live_data} + { ' | '.join(base_signals) if base_signals else 'Deep Scan' }"
         else:
             report = " | ".join(base_signals) if base_signals else "General scan complete."
@@ -132,7 +146,6 @@ class ClawPrime:
         if audit_result.startswith("BLOCK"): return []
 
         pipeline = [("ClawMem", task)]
-        
         if len(task.split()) > 3 or "?" in task:
             pipeline.append(("TrinityClaw", task))
             
