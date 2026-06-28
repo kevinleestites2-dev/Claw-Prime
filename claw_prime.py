@@ -3,6 +3,7 @@ import time
 import os
 
 class LegionBus:
+    """The single source of truth for inter-Claw communication."""
     def __init__(self):
         self.messages = []
     def publish(self, sender, data, metadata=None):
@@ -10,12 +11,20 @@ class LegionBus:
         self.messages.append(entry)
         print(f"[BUS] {sender} >> {data}")
 
+class ArmoryLoader:
+    """The gateway to the 5,300+ Awesome OpenClaw Skills."""
+    def __init__(self):
+        self.source = "https://github.com/VoltAgent/awesome-openclaw-skills"
+    def load_skill(self, skill_name):
+        print(f"[ARMORY] Indexing {skill_name} from {self.source}...")
+        # Future: Actual scraping/parsing logic
+        return True
+
 class ClawAgent:
-    def __init__(self, name, domain, tools=None):
+    def __init__(self, name, domain):
         self.name = name
         self.domain = domain
-        self.tools = tools or []
-    def run(self, task, bus):
+    def run(self, task, bus, armory):
         print(f"[{self.name}] ACT: Executing in domain {self.domain}...")
         result = f"Action complete by {self.name} on: {task[:30]}"
         bus.publish(self.name, result)
@@ -26,6 +35,7 @@ class ClawPrime:
         self.name = "Claw-Prime"
         self.storage_path = storage_path
         self.bus = LegionBus()
+        self.armory = ArmoryLoader()
         self.memory = self.load_memory()
         
         self.legion = {
@@ -58,7 +68,7 @@ class ClawPrime:
     def secure_router(self, task):
         task_lower = task.lower()
         print(f"[{self.name}] SECURITY: IronClaw performing pre-flight audit...")
-        self.legion["IronClaw"].run(f"Audit task: {task}", self.bus)
+        self.legion["IronClaw"].run(f"Audit task: {task}", self.bus, self.armory)
 
         if any(k in task_lower for k in ["scale", "swarm", "parallel"]):
             return [self.legion["ClawSwarm"], self.legion["AutoClaw"]]
@@ -75,22 +85,24 @@ class ClawPrime:
         agents = self.secure_router(task)
         results = []
         for agent in agents:
-            res = agent.run(task, self.bus)
+            res = agent.run(task, self.bus, self.armory)
             results.append(res)
         self.memory.append({"task": task, "results": results, "timestamp": time.time()})
         self.save_memory()
-        print(f"[{self.name}] LEARN: State persisted to {self.storage_path}")
+        print(f"[{self.name}] LEARN: State persisted.")
         return results
 
     def cli(self):
         print(f"\n--- {self.name} COMMAND INTERFACE ---")
+        print("Legion Online. Armory Linked. Standing by.")
         while True:
             try:
                 cmd = input(f"{self.name} > ")
                 if cmd.lower() in ['exit', 'quit']: break
+                if not cmd.strip(): continue
                 self.safla_cycle(cmd)
-            except KeyboardInterrupt: break
+            except (KeyboardInterrupt, EOFError): break
 
 if __name__ == "__main__":
     commander = ClawPrime()
-    commander.safla_cycle("Scale the research on World project and audit for security.")
+    commander.cli()
