@@ -1,56 +1,76 @@
+import json
 import time
 
+class LegionBus:
+    def __init__(self):
+        self.messages = []
+    def publish(self, sender, data):
+        self.messages.append({"sender": sender, "data": data, "timestamp": time.time()})
+        print(f"[BUS] {sender}: {data}")
+
 class ClawAgent:
-    def __init__(self, name, role):
+    def __init__(self, name, capabilities):
         self.name = name
-        self.role = role
-    def execute(self, task):
-        print(f"[{self.name}] ACT: Executing {task}...")
-        return {"agent": self.name, "status": "success", "data": f"Result from {self.name}"}
+        self.capabilities = capabilities
+    def run(self, task, bus):
+        print(f"[{self.name}] ACT: Running domain logic for {task[:30]}...")
+        result = f"Output from {self.name} for {task[:20]}"
+        bus.publish(self.name, result)
+        return result
 
 class ClawPrime:
     def __init__(self):
         self.name = "Claw-Prime"
+        self.bus = LegionBus()
         self.memory = []
         self.legion = {
-            "ARC": ClawAgent("ARC", "Research"),
-            "AutoClaw": ClawAgent("AutoClaw", "Execution")
+            "ARC": ClawAgent("ARC", ["research", "analysis"]),
+            "AutoClaw": ClawAgent("AutoClaw", ["execution", "automation"]),
+            "IronClaw": ClawAgent("IronClaw", ["security", "audit"]),
+            "ClawMem": ClawAgent("ClawMem", ["persistence", "recall"])
         }
 
-    def safla_step(self, task):
-        """A single iteration of Sense, Act, Feedback, Learn, Act."""
+    def router(self, task):
+        # Dispatcher intelligence
+        task_lower = task.lower()
+        if any(kw in task_lower for kw in ["research", "find", "who", "what"]):
+            return self.legion["ARC"]
+        if any(kw in task_lower for kw in ["run", "do", "click", "build"]):
+            return self.legion["AutoClaw"]
+        return self.legion["AutoClaw"]
+
+    def safla_cycle(self, task):
+        """The core Sense-Act-Feedback-Learn-Act loop."""
         # 1. SENSE
-        print(f"\n[{self.name}] --- SAFLA ITERATION START ---")
-        print(f"[{self.name}] SENSE: Processing task -> {task}")
+        print(f"\n[{self.name}] SENSE: New Task -> {task}")
+        self.bus.publish(self.name, f"Sense phase complete for {task[:20]}")
         
-        # 2. ACT (Dispatch)
-        agent = self.legion["ARC"] if "research" in task.lower() else self.legion["AutoClaw"]
-        result = agent.execute(task)
+        # 2. ACT
+        agent = self.router(task)
+        print(f"[{self.name}] DISPATCH: Routing to {agent.name}")
+        action_result = agent.run(task, self.bus)
         
         # 3. FEEDBACK
-        print(f"[{self.name}] FEEDBACK: Agent {agent.name} result: {result['status']}")
+        print(f"[{self.name}] FEEDBACK: Observing result -> {action_result}")
         
         # 4. LEARN
-        self.memory.append(result)
-        print(f"[{self.name}] LEARN: Memory updated. {len(self.memory)} entries stored.")
+        observation = {"task": task, "agent": agent.name, "result": action_result}
+        self.memory.append(observation)
+        print(f"[{self.name}] LEARN: Updating state with {agent.name} metrics.")
         
-        # 5. ACT (Next Step / Refinement)
-        print(f"[{self.name}] ACT: Transitioning to next state...")
-        return result
+        # 5. ACT (Refinement)
+        print(f"[{self.name}] REFINING: Preparing next stage of execution.")
+        return action_result
 
-    def run_self_loop(self, initial_task, max_iterations=5):
-        """The core Self-Looping Engine."""
-        current_task = initial_task
-        for i in range(max_iterations):
-            print(f"\n[LOOP {i+1}/{max_iterations}]")
-            result = self.safla_step(current_task)
-            
-            # Simulated feedback loop: modify task based on previous result
-            current_task = f"Refine: {result['data']}"
-            time.sleep(1)
-            
-        print(f"\n[{self.name}] Self-Loop complete. Objective reached.")
+    def autonomous_loop(self, task, depth=3):
+        print(f"[{self.name}] STARTING AUTONOMOUS ENGINE (Depth: {depth})")
+        current_objective = task
+        for i in range(depth):
+            print(f"\n--- LOOP {i+1} ---")
+            result = self.safla_cycle(current_objective)
+            current_objective = f"Refine and verify: {result}"
+        print(f"[{self.name}] Objective Finalized.")
 
 if __name__ == "__main__":
     commander = ClawPrime()
-    commander.run_self_loop("Research World project and optimize the stack.")
+    commander.autonomous_loop("Execute the high-signal research on Solana project Heisted.")
