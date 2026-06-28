@@ -17,7 +17,6 @@ class ClawAgent:
         self.tools = tools or []
     def run(self, task, bus):
         print(f"[{self.name}] ACT: Executing in domain {self.domain}...")
-        # Placeholder for actual module integration
         result = f"Action complete by {self.name} on: {task[:30]}"
         bus.publish(self.name, result)
         return result
@@ -29,7 +28,6 @@ class ClawPrime:
         self.bus = LegionBus()
         self.memory = self.load_memory()
         
-        # Instantiate ALL 12 Legion pieces
         self.legion = {
             "OpenClaw": ClawAgent("OpenClaw", "Core Execution"),
             "ARC": ClawAgent("ARC", "Deep Research"),
@@ -47,8 +45,10 @@ class ClawPrime:
 
     def load_memory(self):
         if os.path.exists(self.storage_path):
-            with open(self.storage_path, 'r') as f:
-                return json.load(f)
+            try:
+                with open(self.storage_path, 'r') as f:
+                    return json.load(f)
+            except: return []
         return []
 
     def save_memory(self):
@@ -56,56 +56,41 @@ class ClawPrime:
             json.dump(self.memory, f, indent=4)
 
     def secure_router(self, task):
-        """Enhanced Router: Pre-flight security check and multi-agent routing."""
         task_lower = task.lower()
-        
-        # 1. Pre-flight: IronClaw Audit
         print(f"[{self.name}] SECURITY: IronClaw performing pre-flight audit...")
         self.legion["IronClaw"].run(f"Audit task: {task}", self.bus)
 
-        # 2. Parallel Dispatch/Swarm logic
-        if "scale" in task_lower or "mass" in task_lower:
+        if any(k in task_lower for k in ["scale", "swarm", "parallel"]):
             return [self.legion["ClawSwarm"], self.legion["AutoClaw"]]
-        
-        # 3. Domain Routing
-        if any(k in task_lower for k in ["research", "analyze"]):
+        if any(k in task_lower for k in ["research", "analyze", "find"]):
             return [self.legion["ARC"]]
-        if any(k in task_lower for k in ["browser", "web"]):
+        if any(k in task_lower for k in ["browser", "web", "site"]):
             return [self.legion["OpenBrowserClaw"]]
-        if any(k in task_lower for k in ["rust", "speed"]):
+        if any(k in task_lower for k in ["rust", "speed", "crabs"]):
             return [self.legion["OpenCrabs"]]
-            
         return [self.legion["OpenClaw"]]
 
     def safla_cycle(self, task):
         print(f"\n[{self.name}] SENSE: {task}")
-        
-        # ACT: Secure Routing
         agents = self.secure_router(task)
         results = []
         for agent in agents:
             res = agent.run(task, self.bus)
             results.append(res)
-            
-        # FEEDBACK & LEARN
         self.memory.append({"task": task, "results": results, "timestamp": time.time()})
         self.save_memory()
         print(f"[{self.name}] LEARN: State persisted to {self.storage_path}")
-        
         return results
 
     def cli(self):
-        """Live Command Interface"""
         print(f"\n--- {self.name} COMMAND INTERFACE ---")
         while True:
             try:
                 cmd = input(f"{self.name} > ")
                 if cmd.lower() in ['exit', 'quit']: break
                 self.safla_cycle(cmd)
-            except KeyboardInterrupt:
-                break
+            except KeyboardInterrupt: break
 
 if __name__ == "__main__":
     commander = ClawPrime()
-    # To start live: commander.cli()
     commander.safla_cycle("Scale the research on World project and audit for security.")
