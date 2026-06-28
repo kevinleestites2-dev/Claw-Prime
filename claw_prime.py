@@ -2,7 +2,6 @@ import json
 import time
 import os
 import re
-import urllib.request
 import urllib.parse
 
 class LegionBus:
@@ -30,22 +29,17 @@ class ClawAgent:
         return result
 
 class OpenBrowserClawAgent(ClawAgent):
-    """OpenBrowserClaw: Real-world signal ingestion via HTTP/Search."""
+    """OpenBrowserClaw: Real-world signal ingestion interface."""
     def run(self, task, bus, armory):
-        print(f"[{self.name}] ACT: Ingesting live web signals...")
-        # Extract potential query
+        print(f"[{self.name}] ACT: Preparing live web signal ingestion...")
+        # Extract query for internal engine logic
         query = task.replace("research", "").replace("find", "").strip()
-        encoded_query = urllib.parse.quote(query)
         
-        # In a restricted environment, we provide the structured search interface
-        # For the engine, we implement the search logic that ARC can consume
-        search_url = f"https://www.google.com/search?q={encoded_query}"
-        bus.publish(self.name, f"SEARCH_QUERY: {query}")
-        bus.publish(self.name, f"TARGET_URL: {search_url}")
+        # Publish query for engine consumption (omitting ungrounded search URLs)
+        bus.publish(self.name, f"INTERNAL_QUERY: {query}")
         
-        # Simulate the fetch/parse phase for the engine logic
-        # In full deployment, this triggers the browser tool
-        res = f"SIGNAL_INGESTED: Live data stream established for '{query}'"
+        # In a grounded environment, this prepares the browser interface
+        res = f"SIGNAL_INGESTED: Pipeline ready for '{query}'"
         bus.publish(self.name, res)
         return res
 
@@ -143,7 +137,6 @@ class ClawPrime:
             pipeline.append(("TrinityClaw", task))
             
         if any(k in task_lower for k in ["research", "analyze", "find", "signal"]):
-            # Piece 5: Inject Browser before ARC for live signals
             pipeline.append(("OpenBrowserClaw", task))
             pipeline.append(("ARC", task))
         elif any(k in task_lower for k in ["scale", "swarm", "parallel"]):
@@ -166,7 +159,6 @@ class ClawPrime:
             if agent_name == "ClawMem":
                 res = agent.run(agent_task, self.bus, self.armory, memory=self.memory)
             elif agent_name == "ARC":
-                # ARC now consumes signals from previous Browser/Search step
                 res = agent.run(agent_task, self.bus, self.armory, live_data=last_agent_res)
             else:
                 res = agent.run(agent_task, self.bus, self.armory)
